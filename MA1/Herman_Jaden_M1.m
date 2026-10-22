@@ -1,0 +1,125 @@
+%% MAE 453 
+% MATLAB Assignment 1
+% Jaden Herman
+
+clear;
+clc;
+close all;
+
+%% (a) Load aircraft data
+scriptFolder = fileparts(mfilename('fullpath'));
+data = load(fullfile(scriptFolder, 'MA1.mat'));
+
+W = double(data.W);               % Weight [lbf]
+rho = double(data.rho);           % Density [slug/ft^3]
+S = double(data.S);               % Wing reference area [ft^2]
+b = double(data.b);               % Wingspan [ft]
+cbar = double(data.cbar);         % Mean aerodynamic chord [ft]
+X_CG = double(data.X_CG);         % CG location [ft], positive aft
+Mach = double(data.Mach);         % Mach # [-]
+alpha = double(data.alphadeg(:)); % Angle of attack [deg]
+CL = double(data.CL(:));          % Lift coefficient [-]
+Cm = double(data.Cm(:));          % Pitching-moment coefficient about CG [-]
+
+%% (b) Plot C_L vs AOA
+alphaPlot = linspace(min(alpha), max(alpha), 200);
+liftFigure = figure('Name', 'C_L vs AOA', 'Color', 'w');
+plot(alpha, CL, 'bo', 'MarkerFaceColor', 'b', 'MarkerSize', 6);
+hold on;
+grid on;
+xlabel('Angle of attack, \alpha [deg]');
+ylabel('Lift coefficient, C_L');
+title('C_L vs. \alpha: Sea Level, Mach 0.16');
+legend('Supplied data', 'Location', 'best');
+
+%% (c) Plot C_m vs AOA
+momentFigure = figure('Name', 'C_M vs AOA', 'Color', 'w');
+plot(alpha, Cm, 'ro', 'MarkerFaceColor', 'r', 'MarkerSize', 6);
+hold on;
+yline(0, ':', 'HandleVisibility', 'off');
+grid on;
+xlabel('Angle of attack, \alpha [deg]');
+ylabel('Pitching-moment coefficient, C_m');
+title('C_m vs. \alpha: Sea Level, Mach 0.16, \delta_e = 0 deg');
+legend('Supplied data', 'Location', 'best');
+
+%% (d) Linear fits: CL = CL0 + CL_alpha*alpha; Cm = Cm0 + Cm_alpha*alpha
+% polyfit returns [slope, intercept] for a first-order fit
+liftFit = polyfit(alpha, CL, 1);
+momentFit = polyfit(alpha, Cm, 1);
+CL_alpha = liftFit(1);
+CL0 = liftFit(2);
+Cm_alpha = momentFit(1);
+Cm0 = momentFit(2);
+
+fprintf('MAE 453 - MATLAB Assignment 1\n');
+fprintf('Sea-level data at Mach %.2f\n\n', Mach);
+fprintf('LINEAR FIT RESULTS\n');
+fprintf('CL_alpha = % .8f/deg\n', CL_alpha);
+fprintf('Cm_alpha = % .8f/deg\n', Cm_alpha);
+fprintf('CL0      = % .8f\n', CL0);
+fprintf('Cm0      = % .8f\n\n', Cm0);
+
+% Add fitted lines to plots
+figure(liftFigure);
+plot(alphaPlot, polyval(liftFit, alphaPlot), 'k-', 'LineWidth', 1.5);
+legend('Supplied data', 'Linear fit', 'Location', 'best');
+figure(momentFigure);
+plot(alphaPlot, polyval(momentFit, alphaPlot), 'k-', 'LineWidth', 1.5);
+legend('Supplied data', 'Linear fit', 'Location', 'best');
+
+%% (e) Trim angle and neutral point for given flight condition
+% At zero elevator, pitch trim requires Cm0 + Cm_alpha*Alpha_Trim = 0.
+Alpha_Trim = -Cm0/Cm_alpha;        % [deg]
+
+% Cm_alpha/CL_alpha = (X_CG - X_NP)/cbar
+X_NP = X_CG - cbar*Cm_alpha/CL_alpha;  % [ft]
+staticMargin = (X_NP - X_CG)/cbar;
+
+fprintf('BASELINE TRIM AND NEUTRAL POINT\n');
+fprintf('Alpha_Trim = %.6f deg (given cond, zero elevator)\n', Alpha_Trim);
+fprintf('X_NP       = %.6f ft from the same datum as X_CG\n', X_NP);
+fprintf('Static margin = %.4f %% MAC\n\n', 100*staticMargin);
+
+%% (f) Trim velocity and stall check with tail incidence and elevator
+ih = -2;                      % Tail incidence [deg]
+Cm_ih = -0.05;                % Moment derivative wrt incidence [/deg]
+Cm_delta_e = -0.025;          % Moment derivative wrt elevator [/deg]
+CL_max = 1.6;
+de_trim = (-9:1:9)';          % Strict limits: -10 < de_trim < 10 [deg]
+
+% Assume steady level flight: L = W, T=D
+% Keep supplied derivatives fixed as velocity varies, no Mach corrections are provided
+% Pitch trim: 0 = Cm0 + Cm_alpha*alpha_trim + Cm_ih*ih + Cm_delta_e*de_trim
+alpha_trim = -(Cm0 + Cm_ih*ih + Cm_delta_e*de_trim)/Cm_alpha;
+CL_trim = CL0 + CL_alpha*alpha_trim;
+
+% Lift equilibrium gives V = sqrt(2*W/(rho*S*CL_trim)) [ft/s]
+% For CL_trim <= 0, no finite positive speed can support the weight
+V_trim = NaN(size(de_trim));
+positiveLift = CL_trim > 0;
+V_trim(positiveLift) = sqrt(2*W./(rho*S*CL_trim(positiveLift)));
+V_stall = sqrt(2*W/(rho*S*CL_max));
+
+fprintf('TRIM SWEEP: ih = %.1f deg, CL_max = %.2f\n', ih, CL_max);
+fprintf('V_stall at CL_max = %.4f ft/s\n\n', V_stall);
+fprintf('%10s %13s %11s %15s %10s\n', ...
+    'de (deg)', 'alpha (deg)', 'CL trim', 'V trim (ft/s)', 'Stalled?');
+fprintf('%s\n', repmat('-', 1, 65));
+
+for k = 1:numel(de_trim)
+    if ~positiveLift(k)
+        stallStatus = 'N/A';
+    elseif CL_trim(k) > CL_max
+        stallStatus = 'YES';
+    else
+        stallStatus = 'NO';
+    end
+    fprintf('%10.0f %13.5f %11.5f %15.5f %10s\n', ...
+        de_trim(k), alpha_trim(k), CL_trim(k), V_trim(k), stallStatus);
+end
+
+fprintf('\nYES: required CL exceeds CL_max; predicted trim is stalled.\n');
+fprintf('For stalled rows, V is only the formal linear-model result.\n');
+fprintf('NaN / N/A: no positive-lift steady level-flight solution.\n');
+fprintf('Trim angles outside the supplied data range are extrapolated.\n');
