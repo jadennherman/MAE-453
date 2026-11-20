@@ -1,0 +1,16 @@
+%% MAE 453 
+% MATLAB Assignment 2
+% Jaden Herman
+
+clear;
+clc;
+close all;
+
+%% (a) Load aircraft data
+scriptFolder = fileparts(mfilename('fullpath'));
+data = load(fullfile(scriptFolder, 'MA2.mat'));
+
+ctrlCase = input('Input case 1-4:')
+
+if ctrlCase = 1
+    
