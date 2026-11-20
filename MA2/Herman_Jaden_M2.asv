@@ -10,7 +10,28 @@ close all;
 scriptFolder = fileparts(mfilename('fullpath'));
 data = load(fullfile(scriptFolder, 'MA2.mat'));
 
-ctrlCase = input('Input case 1-4:')
+ctrlCase = input('Input case 1-4:');
 
-if ctrlCase = 1
-    
+% Case 1
+elev = 0;
+ail = 0;
+rud = 0;
+
+if ctrlCase == 2
+    elev = 5;
+elseif ctrlCase == 3
+    ail = 1;
+elseif ctrlCase == 4
+    rud = 1;
+end
+
+controls = deg2rad([elev; ail; rud]);
+caseNames = {'No control deflection', 'Elevator = 5 deg', ...
+    'Aileron = 1 deg', 'Rudder = 1 deg'};
+caseLabel = sprintf('Case %d: %s', ctrlCase, caseNames{ctrlCase});
+
+U1 = data.U1;
+g = data.g;
+Theta1 = 0;
+
+X_Tu = 0
