@@ -6,9 +6,10 @@ clear;
 clc;
 close all;
 
-%% (a) Load aircraft data
 scriptFolder = fileparts(mfilename('fullpath'));
 data = load(fullfile(scriptFolder, 'MA2.mat'));
+
+%% Cases and init conds
 
 ctrlCase = input('Input case 1-4:');
 
@@ -34,16 +35,16 @@ U1 = data.U1;
 g = data.g;
 Theta1 = 0;
 
-X_Tu = 0;
-M_Tu = 0;
-M_Talpha = 0;
-Z_alphadot = 0;
-Z_q = 0;
-Y_p = 0;
-Y_r = 0;
-N_Tbeta = 0;
+data.X_Tu = 0;
+data.M_Tu = 0;
+data.M_Talpha = 0;
+data.Z_alphadot = 0;
+data.Z_q = 0;
+data.Y_p = 0;
+data.Y_r = 0;
+data.N_Tbeta = 0;
 
-% Let E*xdot = F*x + G*controls
+%% Let E*xdot = F*x + G*controls
 E = eye(9);
 F = zeros(9);
 G = zeros(9, 3);
@@ -88,3 +89,51 @@ F(9, 6) = 1;
 
 A = E\F;
 B = E\G;
+
+%% Integrate selected case
+x0 = zeros(9, 1);
+tspan = 0:0.1:120;    % seconds
+options = odeset('RelTol', 1e-8, 'AbsTol', 1e-10);
+[t, x] = ode45(@(t, x) A*x + B*controls, tspan, x0, options);
+
+% Angles remain in radians during integration; convert only for plotting
+anglesDeg = rad2deg(x(:, 7:9));
+ratesDeg = rad2deg(x(:, 4:6));
+fprintf('\n%s\n', caseLabel);
+fprintf('All initial perturbations = 0. Simulation time = %.0f s.\n', t(end));
+
+%% Plot translational velocity perturbations (Figure 1)
+figure('Name', [caseLabel, ' - Translational velocities'], 'Color', 'w');
+velocityLabels = {'u (ft/s)', 'v (ft/s)', 'w (ft/s)'};
+for k = 1:3
+    subplot(3, 1, k);
+    plot(t, x(:, k), 'LineWidth', 1.4);
+    grid on;
+    xlabel('Time (s)');
+    ylabel(velocityLabels{k});
+end
+sgtitle([caseLabel, ' | Translational velocity perturbations']);
+
+%% Plot rotational velocity perturbations (Figure 2)
+figure('Name', [caseLabel, ' - Rotational velocities'], 'Color', 'w');
+rateLabels = {'p (deg/s)', 'q (deg/s)', 'r (deg/s)'};
+for k = 1:3
+    subplot(3, 1, k);
+    plot(t, ratesDeg(:, k), 'LineWidth', 1.4);
+    grid on;
+    xlabel('Time (s)');
+    ylabel(rateLabels{k});
+end
+sgtitle([caseLabel, ' | Rotational velocity perturbations']);
+
+%% Plot Euler angle perturbations (Figure 3)
+figure('Name', [caseLabel, ' - Euler angles'], 'Color', 'w');
+angleLabels = {'\phi (deg)', '\theta (deg)', '\psi (deg)'};
+for k = 1:3
+    subplot(3, 1, k);
+    plot(t, anglesDeg(:, k), 'LineWidth', 1.4);
+    grid on;
+    xlabel('Time (s)');
+    ylabel(angleLabels{k});
+end
+sgtitle([caseLabel, ' | Euler angle perturbations']);
